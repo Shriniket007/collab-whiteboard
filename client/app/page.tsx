@@ -6,7 +6,7 @@ import { ChromePicker } from 'react-color'
 
 import { io } from 'socket.io-client'
 import { drawLine } from '../utils/drawLine'
-const socket = io('https://white-board-backend-v0yh.onrender.com')
+const socket = io('http://localhost:3001')
 
 interface pageProps {}
 
