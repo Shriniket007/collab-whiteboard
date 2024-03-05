@@ -31,7 +31,10 @@ type DrawLineProps = {
 const Page: FC<PageProps> = () => {
   const [color, setColor] = useState<string>("#000");
   const [downloadURL, setDownloadURL] = useState<string | null>(null);
-  const [messages, setMessages] = useState<string[]>([]);
+  const [messages, setMessages] = useState<
+    { sender: string; message: string }[]
+  >([]);
+
   const [newMessage, setNewMessage] = useState<string>("");
   const [room, setRoom] = useState<string>("");
   const [userName, setUserName] = useState<string>("");
@@ -69,10 +72,12 @@ const Page: FC<PageProps> = () => {
       );
 
       socket.on("clear", clear);
-
-      socket.on("receive-message", (message: string) => {
-        setMessages([...messages, message]);
-      });
+      socket.on(
+        "receive-message",
+        (message: { sender: string; message: string }) => {
+          setMessages([...messages, message]);
+        }
+      );
 
       return () => {
         socket.off("draw-line");
@@ -129,9 +134,17 @@ const Page: FC<PageProps> = () => {
 
   const handleSendMessage = () => {
     if (newMessage.trim() === "") return;
-    const updatedMessages = [...messages, newMessage];
+    const updatedMessages = [
+      ...messages,
+      { sender: userName, message: newMessage },
+    ];
     setMessages(updatedMessages);
-    socket.emit("send-message", newMessage, room);
+
+    socket.emit(
+      "send-message",
+      { sender: userName, message: newMessage },
+      room
+    );
     setNewMessage("");
   };
 
@@ -197,43 +210,41 @@ const Page: FC<PageProps> = () => {
           </div>
 
           {/* Right side with chat */}
-          <div className="absolute top-20 right-0 z-10 p-4 w-1/4 bg-[#aaa7a7] rounded-lg">
-            <div
-              style={{
-                height: "100%",
-                borderLeft: "1px solid #000",
-                padding: "10px",
-                boxSizing: "border-box",
-                overflowY: "auto",
-              }}
-            >
+          <div className="absolute top-20 right-0 z-10 p-4 w-1/4 bg-gray-100 rounded-lg shadow-lg">
+            <div className="h-full border-l border-gray-300 pl-4">
               <h2 className="mb-4 text-xl font-semibold">Chat</h2>
-              <div style={{ marginBottom: "10px", minHeight: "300px" }}>
+              <div className="overflow-y-auto max-h-96 mb-4">
                 {messages.map((message, index) => (
                   <div
                     key={index}
                     className={`mb-2 p-2 ${
-                      index % 2 === 0 ? "bg-blue-200 text-right" : "bg-gray-200"
-                    }`}
+                      index % 2 === 0 ? "bg-blue-100" : "bg-gray-200"
+                    } rounded-md`}
                   >
-                    {message}
+                    <div className="flex justify-between">
+                      <span className="font-semibold">{message.sender}</span>
+                      <span className="text-xs text-gray-500">Just now</span>
+                    </div>
+                    <div>{message.message}</div>
                   </div>
                 ))}
               </div>
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                className="border p-2 mb-2"
-                placeholder="Type a message..."
-              />
-              <button
-                type="button"
-                onClick={handleSendMessage}
-                className="bg-blue-500 text-white p-2 rounded"
-              >
-                Send
-              </button>
+              <div className="flex items-center">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  className="flex-1 border border-gray-300 p-2 rounded-md mr-2"
+                  placeholder="Type a message..."
+                />
+                <button
+                  type="button"
+                  onClick={handleSendMessage}
+                  className="bg-blue-500 text-white px-4 py-2 rounded-md"
+                >
+                  Send
+                </button>
+              </div>
             </div>
           </div>
         </div>
