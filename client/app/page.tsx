@@ -6,6 +6,7 @@ import { useDraw } from "../hooks/useDraw";
 import { ChromePicker } from "react-color";
 import { io } from "socket.io-client";
 import { drawLine } from "../utils/drawLine";
+import useAuth from "../hooks/useAuth";
 
 const socket = io("http://localhost:3001");
 
@@ -29,6 +30,8 @@ type DrawLineProps = {
 };
 
 const Page: FC<PageProps> = () => {
+  const { isLogin, email, name, logout } = useAuth();
+
   const [color, setColor] = useState<string>("#000");
   const [downloadURL, setDownloadURL] = useState<string | null>(null);
   const [messages, setMessages] = useState<
@@ -37,7 +40,7 @@ const Page: FC<PageProps> = () => {
 
   const [newMessage, setNewMessage] = useState<string>("");
   const [room, setRoom] = useState<string>("");
-  const [userName, setUserName] = useState<string>("");
+  // const [userName, setUserName] = useState<string>("");
   const [joined, setJoined] = useState<boolean>(false);
 
   const { canvasRef, onMouseDown, clear } = useDraw(createLine);
@@ -46,7 +49,7 @@ const Page: FC<PageProps> = () => {
     if (joined) {
       const ctx = canvasRef.current?.getContext("2d");
 
-      socket.emit("client-ready", { room, userName });
+      socket.emit("client-ready", { room, name });
 
       socket.on("get-canvas-state", () => {
         if (!canvasRef.current?.toDataURL()) return;
@@ -87,7 +90,7 @@ const Page: FC<PageProps> = () => {
         socket.off("receive-message");
       };
     }
-  }, [canvasRef, messages, room, userName, joined]);
+  }, [canvasRef, messages, room, name, joined]);
 
   function createLine({ prevPoint, currentPoint, ctx }: Draw) {
     if (!ctx) return; // Skip drawing if ctx is null
@@ -97,7 +100,7 @@ const Page: FC<PageProps> = () => {
   }
 
   const handleJoinRoom = () => {
-    if (room.trim() === "" || userName.trim() === "") return;
+    if (room.trim() === "" || name?.trim() === "") return;
     setJoined(true);
   };
 
@@ -136,118 +139,135 @@ const Page: FC<PageProps> = () => {
     if (newMessage.trim() === "") return;
     const updatedMessages = [
       ...messages,
-      { sender: userName, message: newMessage },
+      { sender: name || "", message: newMessage },
     ];
     setMessages(updatedMessages);
 
-    socket.emit(
-      "send-message",
-      { sender: userName, message: newMessage },
-      room
-    );
+    socket.emit("send-message", { sender: name, message: newMessage }, room);
     setNewMessage("");
   };
 
   return (
-    <div className="relative">
-      {!joined ? (
-        <div className="flex flex-col items-center justify-center h-screen">
-          <input
-            type="text"
-            value={userName}
-            onChange={(e) => setUserName(e.target.value)}
-            placeholder="Enter your name"
-            className="p-2 mb-4 border rounded"
-          />
-          <input
-            type="text"
-            value={room}
-            onChange={(e) => setRoom(e.target.value)}
-            placeholder="Enter room number"
-            className="p-2 mb-4 border rounded"
-          />
-          <button
-            onClick={handleJoinRoom}
-            className="p-2 bg-blue-500 text-white rounded"
-          >
-            Join Room
-          </button>
-        </div>
-      ) : (
-        <div>
-          {/* Header section */}
-          <div className="bg-gray-200 py-4 px-8 mb-4 flex justify-around">
-            <h2 className="text-xl font-semibold">Room: {room}</h2>
-            <p className="text-lg font-semibold">Username: {userName}</p>
-          </div>
+    <div>
+      {isLogin ? (
+        <div className="relative">
+          {!joined ? (
+            <div className="flex flex-col items-center justify-center h-screen">
+              {/* <input
+                type="text"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                placeholder="Enter your name"
+                className="p-2 mb-4 border rounded"
+              /> */}
+              <h2 className="text-2xl text-black ">Welcome {name}</h2>
 
-          {/* Left side with drawing canvas */}
-          <div className="w-screen h-screen bg-white flex justify-center items-center">
-            <div className="flex flex-col gap-10 pr-10">
-              <ChromePicker color={color} onChange={(e) => setColor(e.hex)} />
+              <input
+                type="text"
+                value={room}
+                onChange={(e) => setRoom(e.target.value)}
+                placeholder="Enter room number"
+                className="p-2 mb-4 border rounded"
+              />
               <button
-                type="button"
-                className="p-2 rounded-md border border-black"
-                onClick={() => socket.emit("clear", room)}
+                onClick={handleJoinRoom}
+                className="p-2 bg-blue-500 text-white rounded"
               >
-                Clear canvas
-              </button>
-              <button
-                type="button"
-                className="p-2 rounded-md border border-black"
-                onClick={handleDownload}
-              >
-                Download Image
+                Join Room
               </button>
             </div>
-            <canvas
-              ref={canvasRef}
-              onMouseDown={onMouseDown}
-              width={750}
-              height={750}
-              className="border border-black rounded-md"
-            />
-          </div>
-
-          {/* Right side with chat */}
-          <div className="absolute top-20 right-0 z-10 p-4 w-1/4 bg-gray-100 rounded-lg shadow-lg">
-            <div className="h-full border-l border-gray-300 pl-4">
-              <h2 className="mb-4 text-xl font-semibold">Chat</h2>
-              <div className="overflow-y-auto max-h-96 mb-4">
-                {messages.map((message, index) => (
-                  <div
-                    key={index}
-                    className={`mb-2 p-2 ${
-                      index % 2 === 0 ? "bg-blue-100" : "bg-gray-200"
-                    } rounded-md`}
-                  >
-                    <div className="flex justify-between">
-                      <span className="font-semibold">{message.sender}</span>
-                      <span className="text-xs text-gray-500">Just now</span>
-                    </div>
-                    <div>{message.message}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-center">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  className="flex-1 border border-gray-300 p-2 rounded-md mr-2"
-                  placeholder="Type a message..."
-                />
+          ) : (
+            <div>
+              {/* Header section */}
+              <div className="bg-gray-200 py-4 px-8 mb-4 flex justify-around fixed top-0 left-0 right-0 z-10">
+                <h2 className="text-xl font-semibold">Room: {room}</h2>
+                <p className="text-lg font-semibold">Username: {name}</p>
                 <button
-                  type="button"
-                  onClick={handleSendMessage}
-                  className="bg-blue-500 text-white px-4 py-2 rounded-md"
+                  onClick={logout}
+                  className="bg-blue-900 hover:bg-blue-850 text-white font-bold py-2 px-4 rounded"
                 >
-                  Send
+                  Logout
                 </button>
               </div>
+
+              {/* Left side with drawing canvas */}
+              <div className="w-screen h-screen bg-white flex justify-center items-center">
+                <div className="flex flex-col gap-10 pr-10">
+                  <ChromePicker
+                    color={color}
+                    onChange={(e) => setColor(e.hex)}
+                  />
+                  <button
+                    type="button"
+                    className="p-2 rounded-md border border-black"
+                    onClick={() => socket.emit("clear", room)}
+                  >
+                    Clear canvas
+                  </button>
+                  <button
+                    type="button"
+                    className="p-2 rounded-md border border-black"
+                    onClick={handleDownload}
+                  >
+                    Download Image
+                  </button>
+                </div>
+                <canvas
+                  ref={canvasRef}
+                  onMouseDown={onMouseDown}
+                  width={750}
+                  height={750}
+                  className="border border-black rounded-md"
+                />
+              </div>
+
+              {/* Right side with chat */}
+              <div className="absolute top-20 right-0 z-10 p-4 w-1/4 bg-gray-100 rounded-lg shadow-lg">
+                <div className="h-full border-l border-gray-300 pl-4">
+                  <h2 className="mb-4 text-xl font-semibold">Chat</h2>
+                  <div className="overflow-y-auto max-h-96 mb-4">
+                    {messages.map((message, index) => (
+                      <div
+                        key={index}
+                        className={`mb-2 p-2 ${
+                          index % 2 === 0 ? "bg-blue-100" : "bg-gray-200"
+                        } rounded-md`}
+                      >
+                        <div className="flex justify-between">
+                          <span className="font-semibold">
+                            {message.sender}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            Just now
+                          </span>
+                        </div>
+                        <div>{message.message}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      className="flex-1 border border-gray-300 p-2 rounded-md mr-2"
+                      placeholder="Type a message..."
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSendMessage}
+                      className="bg-blue-500 text-white px-4 py-2 rounded-md"
+                    >
+                      Send
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
+      ) : (
+        <div>login unsuccessfull</div>
       )}
     </div>
   );
